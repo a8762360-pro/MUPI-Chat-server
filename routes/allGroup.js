@@ -23,10 +23,40 @@ module.exports = (allgroup) => {
         }
     });
 
-    // GET /groups/:name 
+    // 🟢 user/email রাউট সরাসরি হ্যান্ডেল করার জন্য
+    router.get("/user/:email", async (req, res) => {
+        try {
+            const userEmail = req.params.email;
+
+            // MongoDB-তে খোঁজ করা যে এই ইমেলটি কোন কোন গ্রুপের members অ্যারেতে আছে
+            const groups = await allgroup.find({ "members.email": userEmail }).toArray();
+
+            res.status(200).send(groups);
+        } catch (error) {
+            console.error("Failed to fetch user groups:", error);
+            res.status(500).send({ message: "Internal server error" });
+        }
+    });
+
+    
+    //  ২. নির্দিষ্ট গ্রুপের মেম্বার লিস্ট আনা
+    router.get("/:name/members", async (req, res) => {
+        try {
+            const name = decodeURIComponent(req.params.name);
+            const result = await allgroup.findOne({ name: name });
+            if (!result) {
+                return res.status(404).send({ message: "Group not found" });
+            }
+            res.send(result.members);
+        } catch (error) {
+            res.status(500).send({ message: "Error fetching members", error });
+        }
+    });
+
+    // 🟢 ৩. জেনেরিক নাম দিয়ে গ্রুপ খোঁজা (এটি সবসময় নির্দিষ্ট রাউটগুলোর নিচে থাকবে)
     router.get('/:name', async (req, res) => {
         try {
-            const groupName = req.params.name;
+            const groupName = decodeURIComponent(req.params.name);
             const result = await allgroup.findOne({ name: groupName });
             if (!result) {
                 return res.status(404).send({ message: "The group is not found" });
@@ -37,12 +67,11 @@ module.exports = (allgroup) => {
         }
     });
 
-    // 🟢 POST /allGroups/:name/messages -> নাম অনুযায়ী নির্দিষ্ট গ্রুপে মেসেজ যোগ করা
+    // POST /allGroups/:name/messages -> মেসেজ যোগ করা
     router.post('/:name/messages', async (req, res) => {
         try {
-            const groupName = req.params.name;
-            const newMessage = req.body; // ফ্রন্টএন্ড থেকে আসা মেসেজ অবজেক্ট
-            // $push অপারেটর ব্যবহার করে messages এরেতে নতুন মেসেজ যুক্ত করা
+            const groupName = decodeURIComponent(req.params.name);
+            const newMessage = req.body;
             const filter = { name: groupName };
             const updateDoc = {
                 $push: {
@@ -62,9 +91,7 @@ module.exports = (allgroup) => {
     // update groupe photo
     router.patch('/:name/photo', async (req, res) => {
         try {
-            const rawGroupName = req.params.name;
-            console.log(rawGroupName)
-
+            const rawGroupName = decodeURIComponent(req.params.name);
             const { photoUrl } = req.body;
             if (!photoUrl) {
                 return res.status(400).send({ message: "photoUrl is required" });
@@ -95,36 +122,32 @@ module.exports = (allgroup) => {
                 error: error.message
             });
         }
+    });
 
-    })
-
-
-    // add memner group
     // POST /allGroups/:name/members -> গ্রুপে নতুন মেম্বার যোগ করা
     router.post("/:name/members", async (req, res) => {
         try {
             const groupName = decodeURIComponent(req.params.name);
-            const { newMember } = req.body; 
-    
+            const { newMember } = req.body;
+
             if (!newMember) {
                 return res.status(400).send({ message: "New member data is required" });
             }
-    
+
             const filter = { name: groupName };
-            // $addToSet ব্যবহার করায় একই মেম্বার বারবার যুক্ত হয়ে ডুপ্লিকেট হবে না
             const updateDoc = {
                 $addToSet: {
                     members: newMember
                 }
             };
-    
+
             const result = await allgroup.updateOne(filter, updateDoc);
             if (result.matchedCount === 0) {
                 return res.status(404).send({ message: "Group not found to add member" });
             }
-    
+
             res.status(200).send({ message: "Member added successfully", result });
-    
+
         } catch (error) {
             console.error("Failed to add member:", error);
             res.status(500).send({
@@ -133,14 +156,6 @@ module.exports = (allgroup) => {
             });
         }
     });
-
-    // get member
-    router.get("/:name/members", async (req, res) => {
-        const name = req.params.name;
-        const result = await allgroup.findOne({name: name})
-        res.send(result.members)
-    })
-
 
     return router;
 };
