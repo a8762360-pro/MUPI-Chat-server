@@ -1,19 +1,24 @@
 const express = require('express');
 const verifyFirebaseToken = require('../Middleeare/verifyFirebaseToken');
 const router = express.Router();
+const bcrypt = require('bcrypt');
 
 module.exports = (userscollection) => {
 
     // 1. POST /users 
     router.post('/', async (req, res) => {
         try {
-            const newUser = req.body;
-            if (!newUser.group) {
-                newUser.group = [];
+            const userFullData = req.body;
+
+            if (userFullData.password) {
+                const hashedPassword = await bcrypt.hash(userFullData.password, 10);
+                userFullData.password = hashedPassword;
             }
-            const result = await userscollection.insertOne(newUser);
+            
+            const result = await userscollection.insertOne(userFullData);
             res.status(201).send(result);
         } catch (error) {
+            console.error("Error creating user:", error);
             res.status(500).send({ message: "Failed to create user", error: error.message });
         }
     });
@@ -53,7 +58,8 @@ module.exports = (userscollection) => {
     // 4. PATCH /users/join-group 
     router.patch('/join-group', async (req, res) => {
         try {
-            const { email, groupName } = req.body;
+            const { email, groupName, groupID } = req.body;
+            console.log(email, groupID, groupName)
 
             if (!email || !groupName) {
                 return res.status(400).send({ message: "Email and groupName are required" });
@@ -63,7 +69,7 @@ module.exports = (userscollection) => {
                 { email: email },
                 {
                     $addToSet: {
-                        group: { name: groupName }
+                        groups: { name: groupName, groupId: groupID }
                     }
                 }
             );

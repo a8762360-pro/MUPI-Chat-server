@@ -41,10 +41,10 @@ module.exports = (allgroup) => {
 
 
     //  get a groupe members list
-    router.get("/:id/members", verifyFirebaseToken, async (req, res) => {
+    router.get("/:groupId/members", verifyFirebaseToken, async (req, res) => {
         try {
-            const id = decodeURIComponent(req.params.id);
-            const result = await allgroup.findOne({ _id: new ObjectId(id) });
+            const id = decodeURIComponent(req.params.groupId);
+            const result = await allgroup.findOne({ groupId: id });
             if (!result) {
                 return res.status(404).send({ message: "Group not found" });
             }
@@ -56,13 +56,13 @@ module.exports = (allgroup) => {
 
 
     // PATCH /allGroups/:name/bg-image -
-    router.patch('/:id/bgImage', verifyFirebaseToken, async (req, res) => {
+    router.patch('/:groupId/bgImage', verifyFirebaseToken, async (req, res) => {
         try {
-            const groupId = req.params.id;
-            const { bgImage } = req.body; 
+            const groupId = req.params.groupId;
+            const { bgImage } = req.body;
 
             const result = await allgroup.updateOne(
-                { _id: new ObjectId(groupId) },
+                { groupId: groupId },
                 { $set: { themeImage: bgImage } }
             );
 
@@ -77,11 +77,10 @@ module.exports = (allgroup) => {
     });
 
     //  get group the id
-    router.get('/:id', verifyFirebaseToken, async (req, res) => {
+    router.get('/:groupId', verifyFirebaseToken, async (req, res) => {
         try {
-            const groupID = req.params.id;
-            // console.log(groupID)
-            const result = await allgroup.findOne({ _id: new ObjectId(groupID) });
+            const id = req.params.groupId;
+            const result = await allgroup.findOne({ groupId: id });
             if (!result) {
                 return res.status(404).send({ message: "The group is not found" });
             }
@@ -92,11 +91,11 @@ module.exports = (allgroup) => {
     });
 
     // add image a group
-    router.post('/:id/messages', verifyFirebaseToken, async (req, res) => {
+    router.post('/:groupId/messages', verifyFirebaseToken, async (req, res) => {
         try {
-            const groupId = decodeURIComponent(req.params.id);
+            const id = decodeURIComponent(req.params.groupId);
             const newMessage = req.body;
-            const filter = { _id: new ObjectId(groupId) };
+            const filter = { groupId: id };
             const updateDoc = {
                 $push: {
                     messages: newMessage
@@ -113,16 +112,16 @@ module.exports = (allgroup) => {
     });
 
     // update groupe photo
-    router.patch('/:id/photo', verifyFirebaseToken, async (req, res) => {
+    router.patch('/:groupId/photo', verifyFirebaseToken, async (req, res) => {
         try {
-            const groupId = decodeURIComponent(req.params.id);
+            const id = decodeURIComponent(req.params.groupId);
             const { photoUrl } = req.body;
             if (!photoUrl) {
                 return res.status(400).send({ message: "photoUrl is required" });
             }
 
             const result = await allgroup.updateOne(
-                { _id: new ObjectId(groupId) },
+                { groupId: id },
                 {
                     $set: {
                         photo: photoUrl,
@@ -149,14 +148,14 @@ module.exports = (allgroup) => {
     });
 
     // POST /allGroups/:name/members 
-    router.post("/:id/members", verifyFirebaseToken, async (req, res) => {
+    router.post("/:groupId/members", verifyFirebaseToken, async (req, res) => {
         try {
-            const groupId = decodeURIComponent(req.params.id);
+            const id = decodeURIComponent(req.params.groupId);
             const { newMember } = req.body;
             if (!newMember) {
                 return res.status(400).send({ message: "New member data is required" });
             }
-            const filter = { _id: new ObjectId(groupId) };
+            const filter = { groupId: id };
             const updateDoc = {
                 $addToSet: {
                     members: newMember
