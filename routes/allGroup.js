@@ -1,9 +1,11 @@
 const express = require('express');
+const { ObjectId } = require('mongodb');
+const verifyFirebaseToken = require('../Middleeare/verifyFirebaseToken');
 const router = express.Router();
 
 module.exports = (allgroup) => {
     // POST /groups
-    router.post("/", async (req, res) => {
+    router.post("/", verifyFirebaseToken, async (req, res) => {
         try {
             const data = req.body;
             const result = await allgroup.insertOne(data);
@@ -14,7 +16,7 @@ module.exports = (allgroup) => {
     });
 
     // GET /groups 
-    router.get("/", async (req, res) => {
+    router.get("/", verifyFirebaseToken, async (req, res) => {
         try {
             const result = await allgroup.find().toArray();
             res.status(200).send(result);
@@ -23,12 +25,11 @@ module.exports = (allgroup) => {
         }
     });
 
-    // 🟢 user/email রাউট সরাসরি হ্যান্ডেল করার জন্য
-    router.get("/user/:email", async (req, res) => {
+    //  check the user connects groups
+    router.get("/user/:email", verifyFirebaseToken, async (req, res) => {
         try {
             const userEmail = req.params.email;
 
-            // MongoDB-তে খোঁজ করা যে এই ইমেলটি কোন কোন গ্রুপের members অ্যারেতে আছে
             const groups = await allgroup.find({ "members.email": userEmail }).toArray();
 
             res.status(200).send(groups);
@@ -38,12 +39,12 @@ module.exports = (allgroup) => {
         }
     });
 
-    
-    //  ২. নির্দিষ্ট গ্রুপের মেম্বার লিস্ট আনা
-    router.get("/:name/members", async (req, res) => {
+
+    //  get a groupe members list
+    router.get("/:id/members", verifyFirebaseToken, async (req, res) => {
         try {
-            const name = decodeURIComponent(req.params.name);
-            const result = await allgroup.findOne({ name: name });
+            const id = decodeURIComponent(req.params.id);
+            const result = await allgroup.findOne({ _id: new ObjectId(id) });
             if (!result) {
                 return res.status(404).send({ message: "Group not found" });
             }
@@ -53,11 +54,34 @@ module.exports = (allgroup) => {
         }
     });
 
-    // 🟢 ৩. জেনেরিক নাম দিয়ে গ্রুপ খোঁজা (এটি সবসময় নির্দিষ্ট রাউটগুলোর নিচে থাকবে)
-    router.get('/:name', async (req, res) => {
+
+    // PATCH /allGroups/:name/bg-image -
+    router.patch('/:id/bgImage', verifyFirebaseToken, async (req, res) => {
         try {
-            const groupName = decodeURIComponent(req.params.name);
-            const result = await allgroup.findOne({ name: groupName });
+            const groupId = req.params.id;
+            const { bgImage } = req.body; 
+
+            const result = await allgroup.updateOne(
+                { _id: new ObjectId(groupId) },
+                { $set: { themeImage: bgImage } }
+            );
+
+            if (result.matchedCount === 0) {
+                return res.status(404).send({ message: "Group not found" });
+            }
+
+            res.status(200).send({ message: "Theme image updated successfully", result });
+        } catch (error) {
+            res.status(500).send({ message: "Failed to update theme image", error: error.message });
+        }
+    });
+
+    //  get group the id
+    router.get('/:id', verifyFirebaseToken, async (req, res) => {
+        try {
+            const groupID = req.params.id;
+            // console.log(groupID)
+            const result = await allgroup.findOne({ _id: new ObjectId(groupID) });
             if (!result) {
                 return res.status(404).send({ message: "The group is not found" });
             }
@@ -67,12 +91,12 @@ module.exports = (allgroup) => {
         }
     });
 
-    // POST /allGroups/:name/messages -> মেসেজ যোগ করা
-    router.post('/:name/messages', async (req, res) => {
+    // add image a group
+    router.post('/:id/messages', verifyFirebaseToken, async (req, res) => {
         try {
-            const groupName = decodeURIComponent(req.params.name);
+            const groupId = decodeURIComponent(req.params.id);
             const newMessage = req.body;
-            const filter = { name: groupName };
+            const filter = { _id: new ObjectId(groupId) };
             const updateDoc = {
                 $push: {
                     messages: newMessage
@@ -89,16 +113,16 @@ module.exports = (allgroup) => {
     });
 
     // update groupe photo
-    router.patch('/:name/photo', async (req, res) => {
+    router.patch('/:id/photo', verifyFirebaseToken, async (req, res) => {
         try {
-            const rawGroupName = decodeURIComponent(req.params.name);
+            const groupId = decodeURIComponent(req.params.id);
             const { photoUrl } = req.body;
             if (!photoUrl) {
                 return res.status(400).send({ message: "photoUrl is required" });
             }
 
             const result = await allgroup.updateOne(
-                { name: rawGroupName },
+                { _id: new ObjectId(groupId) },
                 {
                     $set: {
                         photo: photoUrl,
@@ -124,17 +148,15 @@ module.exports = (allgroup) => {
         }
     });
 
-    // POST /allGroups/:name/members -> গ্রুপে নতুন মেম্বার যোগ করা
-    router.post("/:name/members", async (req, res) => {
+    // POST /allGroups/:name/members 
+    router.post("/:id/members", verifyFirebaseToken, async (req, res) => {
         try {
-            const groupName = decodeURIComponent(req.params.name);
+            const groupId = decodeURIComponent(req.params.id);
             const { newMember } = req.body;
-
             if (!newMember) {
                 return res.status(400).send({ message: "New member data is required" });
             }
-
-            const filter = { name: groupName };
+            const filter = { _id: new ObjectId(groupId) };
             const updateDoc = {
                 $addToSet: {
                     members: newMember
