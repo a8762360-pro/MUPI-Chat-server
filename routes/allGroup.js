@@ -178,5 +178,23 @@ module.exports = (allgroup) => {
         }
     });
 
+    // Remove member from group (Admin only)
+    router.delete('/:groupId/members/:email', verifyFirebaseToken, async (req, res) => {
+        try {
+            const groupId = decodeURIComponent(req.params.groupId);
+            const memberEmail = req.params.email;
+            console.log(groupId, memberEmail)
+
+            const result = await allgroup.updateOne(
+                { groupId: groupId }, // অথবা আপনার আইডি ফিল্ড অনুযায়ী _id হলে ObjectId ব্যবহার করবেন
+                { $pull: { members: { email: memberEmail } } }
+            );
+
+            res.send(result);
+        } catch (error) {
+            res.status(500).send({ error: error.message });
+        }
+    });
+
     return router;
 };

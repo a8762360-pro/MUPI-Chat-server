@@ -14,7 +14,7 @@ module.exports = (userscollection) => {
                 const hashedPassword = await bcrypt.hash(userFullData.password, 10);
                 userFullData.password = hashedPassword;
             }
-            
+
             const result = await userscollection.insertOne(userFullData);
             res.status(201).send(result);
         } catch (error) {
@@ -40,8 +40,41 @@ module.exports = (userscollection) => {
         }
     });
 
-    // 3. GET /users/:email 
-    router.get('/:email', async (req, res) => {
+    // // 4. PATCH /users/join-group 
+    // router.patch('/join-group', verifyFirebaseToken, async (req, res) => {
+    //     try {
+    //         const { email, groupName, groupID } = req.body;
+    //         console.log(email, groupID, groupName)
+
+    //         if (!email || !groupName) {
+    //             return res.status(400).send({ message: "Email and groupName are required" });
+    //         }
+
+    //         const result = await userscollection.updateOne(
+    //             { email: email },
+    //             {
+    //                 $addToSet: {
+    //                     groups: { name: groupName, groupId: groupID }
+    //                 }
+    //             }
+    //         );
+
+    //         if (result.matchedCount === 0) {
+    //             return res.status(404).send({ message: "User not found" });
+    //         }
+
+    //         res.status(200).send({
+    //             message: "Successfully joined the group",
+    //             result
+    //         });
+    //     } catch (error) {
+    //         console.error("Error joining group:", error);
+    //         res.status(500).send({ message: "Failed to join group", error: error.message });
+    //     }
+    // });
+
+    // 4. GET /users/:email 
+    router.get('/:email', verifyFirebaseToken, async (req, res) => {
         try {
             const email = req.params.email;
             const result = await userscollection.findOne({ email: email });
@@ -55,38 +88,7 @@ module.exports = (userscollection) => {
         }
     });
 
-    // 4. PATCH /users/join-group 
-    router.patch('/join-group', async (req, res) => {
-        try {
-            const { email, groupName, groupID } = req.body;
-            console.log(email, groupID, groupName)
 
-            if (!email || !groupName) {
-                return res.status(400).send({ message: "Email and groupName are required" });
-            }
-
-            const result = await userscollection.updateOne(
-                { email: email },
-                {
-                    $addToSet: {
-                        groups: { name: groupName, groupId: groupID }
-                    }
-                }
-            );
-
-            if (result.matchedCount === 0) {
-                return res.status(404).send({ message: "User not found" });
-            }
-
-            res.status(200).send({
-                message: "Successfully joined the group",
-                result
-            });
-        } catch (error) {
-            console.error("Error joining group:", error);
-            res.status(500).send({ message: "Failed to join group", error: error.message });
-        }
-    });
 
     return router;
 };
