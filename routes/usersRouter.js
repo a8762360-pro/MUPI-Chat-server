@@ -32,6 +32,7 @@ module.exports = (userscollection) => {
                         name: 1,
                         email: 1,
                         imageName: 1,
+                        idCard: 1
                     }
                 })
                 .toArray(); res.status(200).send(result);
@@ -73,7 +74,7 @@ module.exports = (userscollection) => {
     //     }
     // });
 
-    // 4. GET /users/:email 
+    // // 4. GET /users/:email 
     router.get('/:email', verifyFirebaseToken, async (req, res) => {
         try {
             const email = req.params.email;
@@ -88,6 +89,22 @@ module.exports = (userscollection) => {
         }
     });
 
+
+    // get user from idcard idCard
+    router.get('/friend/:idCard', verifyFirebaseToken, async (req, res) => {
+        try {
+            const idCard = req.params.idCard;
+            const result = await userscollection.findOne({ idCard: idCard });
+
+            if (!result) {
+                return res.status(404).send({ message: "User not found" });
+            }
+            res.status(200).send(result);
+            console.log("get friend data")
+        } catch (error) {
+            res.status(500).send({ message: "Error fetching user profile", error: error.message });
+        }
+    });
 
 
     return router;

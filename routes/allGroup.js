@@ -1,9 +1,25 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 const verifyFirebaseToken = require('../Middleeare/verifyFirebaseToken');
+const multer = require('multer'); // ✅ multer রিকোয়ার করা হলো
+const path = require('path');
 const router = express.Router();
 
+// ✅ Multer স্টোরেজ কনফিগারেশন (uploads ফোল্ডারে ফাইল সেভ হবে)
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/'); 
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+const upload = multer({ storage: storage });
+
 module.exports = (allgroup) => {
+
+    
     // POST /groups
     router.post("/", verifyFirebaseToken, async (req, res) => {
         try {
@@ -25,13 +41,11 @@ module.exports = (allgroup) => {
         }
     });
 
-    //  check the user connects groups
+    // check the user connects groups
     router.get("/user/:email", verifyFirebaseToken, async (req, res) => {
         try {
             const userEmail = req.params.email;
-
             const groups = await allgroup.find({ "members.email": userEmail }).toArray();
-
             res.status(200).send(groups);
         } catch (error) {
             console.error("Failed to fetch user groups:", error);
@@ -39,8 +53,7 @@ module.exports = (allgroup) => {
         }
     });
 
-
-    //  get a groupe members list
+    // get a group members list
     router.get("/:groupId/members", verifyFirebaseToken, async (req, res) => {
         try {
             const id = decodeURIComponent(req.params.groupId);
@@ -54,8 +67,7 @@ module.exports = (allgroup) => {
         }
     });
 
-
-    // PATCH /allGroups/:name/bg-image -
+    // PATCH /allGroups/:groupId/bgImage
     router.patch('/:groupId/bgImage', verifyFirebaseToken, async (req, res) => {
         try {
             const groupId = req.params.groupId;
@@ -76,7 +88,7 @@ module.exports = (allgroup) => {
         }
     });
 
-    //  get group the id
+    // get group by the id
     router.get('/:groupId', verifyFirebaseToken, async (req, res) => {
         try {
             const id = req.params.groupId;
@@ -90,12 +102,26 @@ module.exports = (allgroup) => {
         }
     });
 
-    // add image a group
+    // ✅ Riktig definert upload-rute med router
+    router.post('/upload', verifyFirebaseToken, upload.single('file'), (req, res) => {
+        try {
+            console.log(req.file)
+            if (!req.file) {
+                return res.status(400).json({ error: 'No file uploaded' });
+            }
+            res.status(200).json({ filename: req.file.filename });
+        } catch (error) {
+            res.status(500).json({ message: "File upload failed", error: error.message });
+        }
+    });
+    
+    // ২. গ্রুপে মেসেজ যোগ করার রাউট (আপনার দেওয়া কোডটিই সঠিক আছে)
     router.post('/:groupId/messages', verifyFirebaseToken, async (req, res) => {
         try {
             const id = decodeURIComponent(req.params.groupId);
             const newMessage = req.body;
-            const filter = { groupId: id };
+            console.log(newMessage)
+            const filter = { groupId: id }; // আপনার ডাটাবেসের ফিল্ড অনুযায়ী (groupId বা _id হতে পারে)
             const updateDoc = {
                 $push: {
                     messages: newMessage
@@ -111,7 +137,7 @@ module.exports = (allgroup) => {
         }
     });
 
-    // update groupe photo
+    // update group photo
     router.patch('/:groupId/photo', verifyFirebaseToken, async (req, res) => {
         try {
             const id = decodeURIComponent(req.params.groupId);
@@ -147,7 +173,7 @@ module.exports = (allgroup) => {
         }
     });
 
-    // POST /allGroups/:name/members 
+    // POST /allGroups/:groupId/members 
     router.post("/:groupId/members", verifyFirebaseToken, async (req, res) => {
         try {
             const id = decodeURIComponent(req.params.groupId);
@@ -183,10 +209,9 @@ module.exports = (allgroup) => {
         try {
             const groupId = decodeURIComponent(req.params.groupId);
             const memberEmail = req.params.email;
-            console.log(groupId, memberEmail)
 
             const result = await allgroup.updateOne(
-                { groupId: groupId }, // অথবা আপনার আইডি ফিল্ড অনুযায়ী _id হলে ObjectId ব্যবহার করবেন
+                { groupId: groupId },
                 { $pull: { members: { email: memberEmail } } }
             );
 
