@@ -1,11 +1,11 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 const verifyFirebaseToken = require('../Middleeare/verifyFirebaseToken');
-const multer = require('multer'); // ✅ multer রিকোয়ার করা হলো
+const multer = require('multer'); // 
 const path = require('path');
 const router = express.Router();
 
-// ✅ Multer স্টোরেজ কনফিগারেশন (uploads ফোল্ডারে ফাইল সেভ হবে)
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'uploads/'); 
@@ -115,22 +115,36 @@ module.exports = (allgroup) => {
         }
     });
     
-    // ২. গ্রুপে মেসেজ যোগ করার রাউট (আপনার দেওয়া কোডটিই সঠিক আছে)
+    // ২. গ্রুপে মেসেজ যোগ করার রাউট (Updated with lastMessage & updatedAt)
     router.post('/:groupId/messages', verifyFirebaseToken, async (req, res) => {
         try {
             const id = decodeURIComponent(req.params.groupId);
             const newMessage = req.body;
-            console.log(newMessage)
-            const filter = { groupId: id }; // আপনার ডাটাবেসের ফিল্ড অনুযায়ী (groupId বা _id হতে পারে)
+            
+            // যদি ফ্রন্টএন্ড থেকে timestamp না আসে, তবে ব্যাকএন্ড থেকেই যোগ করে দেওয়া হলো
+            const currentTime = newMessage.timestamp || new Date().toISOString();
+            const messageWithTime = {
+                ...newMessage,
+                timestamp: currentTime
+            };
+    
+            const filter = { groupId: id };
             const updateDoc = {
                 $push: {
-                    messages: newMessage
+                    messages: messageWithTime
+                },
+                $set: {
+                    lastMessage: newMessage.sms || newMessage.message || "Sent a message", // আপনার মেসেজ টেক্সট ফিল্ড অনুযায়ী
+                    updatedAt: currentTime
                 }
             };
+    
             const result = await allgroup.updateOne(filter, updateDoc);
+            
             if (result.matchedCount === 0) {
                 return res.status(404).send({ message: "Group not found to add message" });
             }
+            
             res.status(200).send({ message: "Message added successfully", result });
         } catch (error) {
             res.status(500).send({ message: "Failed to send message", error: error.message });

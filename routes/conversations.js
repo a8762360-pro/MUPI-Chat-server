@@ -1,22 +1,61 @@
 const express = require('express');
 const verifyFirebaseToken = require('../Middleeare/verifyFirebaseToken');
 
-const createConversationRouter = (conversationCollection,usercollection) => {
+const createConversationRouter = (conversationCollection, friendRequestCollection) => {
     const router = express.Router();
 
     // POST: নতুন কনভার্সেশন বা চ্যাট রুম তৈরি করার জন্য
     router.post("/", verifyFirebaseToken, async (req, res) => {
         try {
-            const data = req.body;
-
-            // ডাবল চেক: এই chatId বা দুইজনের চ্যাট আগে থেকেই আছে কি না চেক করা ভালো
-            const existingChat = await conversationCollection.findOne({ chatId: data.chatId });
-            if (existingChat) {
-                return res.status(200).send({ message: "Chat already exists", insertedId: existingChat._id, existing: true });
+            const { chatId, participants, messages } = req.body;
+    
+            if (!chatId || !Array.isArray(participants) || participants.length < 2) {
+                return res.status(400).send({
+                    success: false,
+                    message: "chatId এবং অন্তত দুজন participants প্রয়োজন।"
+                });
             }
-
-            const result = await conversationCollection.insertOne(data);
-            res.status(200).send(result);
+    
+            // আগে থেকেই এই chatId বা participants দিয়ে conversation আছে কি না চেক
+            const existingChat = await conversationCollection.findOne({
+                $or: [
+                    { chatId: chatId },
+                    { participants: { $all: participants } }
+                ]
+            });
+    
+            if (existingChat) {
+                // chat already থাকলে pending friend request থাকলে সেটাও পরিষ্কার করে রাখা ভালো
+                if (friendRequestCollection) {
+                    await friendRequestCollection.deleteOne({
+                        participants: { $all: participants }
+                    });
+                }
+    
+                return res.status(200).send({
+                    message: "Chat already exists",
+                    chatId: existingChat.chatId,
+                    insertedId: existingChat._id,
+                    existing: true
+                });
+            }
+    
+            const newConvers = {
+                chatId,
+                participants,
+                messages: Array.isArray(messages) ? messages : [],
+                createdAt: new Date().toISOString()
+            };
+    
+            // friendRequestCollection থেকে ওই দুইজনের request মুছে ফেলা
+            if (friendRequestCollection) {
+                await friendRequestCollection.deleteOne({
+                    participants: { $all: participants }
+                });
+            }
+    
+            const result = await conversationCollection.insertOne(newConvers);
+            res.status(201).send(result);
         } catch (error) {
             console.error("Error creating conversation:", error);
             res.status(500).send({ message: "Internal server error" });
@@ -35,12 +74,41 @@ const createConversationRouter = (conversationCollection,usercollection) => {
         }
     });
 
+    // কনভার্সেশন থেকে নির্দিষ্ট মেসেজ ডিলিট করার রাউট
+    router.delete('/:chatId/messages/:timestamp', verifyFirebaseToken, async (req, res) => {
+        try {
+            const chatId = decodeURIComponent(req.params.chatId);
+            const timestamp = req.params.timestamp;
+            const { sms } = req.query;
+            console.log("jfa", chatId, timestamp)
+
+            const filter = { chatId: chatId };
+            const updateDoc = {
+                $pull: {
+                    messages: {
+                        timestamp: timestamp
+                    }
+                }
+            };
+
+            const result = await conversationCollection.updateOne(filter, updateDoc);
+
+            if (result.modifiedCount === 0) {
+                return res.status(404).send({ message: "Message not found or already deleted" });
+            }
+
+            res.status(200).send({ message: "Message deleted successfully", result });
+        } catch (error) {
+            res.status(500).send({ message: "Failed to delete message", error: error.message });
+        }
+    });
+
 
     // 2. নির্দিষ্ট ইউজারের সাথে জড়িত সমস্ত চ্যাট বা ইনবক্স লিস্ট ফেচ করা
     router.get("/:chatId", verifyFirebaseToken, async (req, res) => {
         try {
             const id = req.params.chatId;
-            const result = await conversationCollection.findOne({chatId: id}).toArray()
+            const result = await conversationCollection.findOne({ chatId: id }).toArray()
             res.status(200).send(result);
         } catch (error) {
             console.error("Error fetching user conversations:", error);

@@ -2,6 +2,7 @@ const express = require('express');
 const verifyFirebaseToken = require('../Middleeare/verifyFirebaseToken');
 const router = express.Router();
 const bcrypt = require('bcrypt');
+const userRequest = require('./userRequiest');
 
 module.exports = (userscollection) => {
 
@@ -35,7 +36,8 @@ module.exports = (userscollection) => {
                         idCard: 1
                     }
                 })
-                .toArray(); res.status(200).send(result);
+                .toArray()
+                ; res.status(200).send(result);
         } catch (error) {
             res.status(500).send({ message: "Failed to fetch users", error: error.message });
         }
@@ -94,13 +96,14 @@ module.exports = (userscollection) => {
     router.get('/friend/:idCard', verifyFirebaseToken, async (req, res) => {
         try {
             const idCard = req.params.idCard;
+            console.log(idCard)
             const result = await userscollection.findOne({ idCard: idCard });
 
             if (!result) {
                 return res.status(404).send({ message: "User not found" });
             }
             res.status(200).send(result);
-            console.log("get friend data")
+            // console.log("get friend data")
         } catch (error) {
             res.status(500).send({ message: "Error fetching user profile", error: error.message });
         }
@@ -109,3 +112,4 @@ module.exports = (userscollection) => {
 
     return router;
 };
+
